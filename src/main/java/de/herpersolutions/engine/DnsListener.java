@@ -52,8 +52,9 @@ public class DnsListener {
                     udpSocket.receive(packet);
 
                     byte[] in = Arrays.copyOfRange(packet.getData(), packet.getOffset(), packet.getOffset()+packet.getLength());
+
                     Message query = new Message(in);
-                    Message resp = engine.answer(query);
+                    Message resp = engine.answer(query, packet.getAddress());
 
                     byte[] out = resp.toWire();
                     if (out.length > 512) {
@@ -97,7 +98,7 @@ public class DnsListener {
                     try { len = in.readUnsignedShort(); } catch (EOFException eof) { break; }
                     byte[] msg = in.readNBytes(len);
                     Message query = new Message(msg);
-                    Message resp = engine.answer(query);
+                    Message resp = engine.answer(query, s.getInetAddress());
                     byte[] wire = resp.toWire();
                     out.writeShort(wire.length);
                     out.write(wire);

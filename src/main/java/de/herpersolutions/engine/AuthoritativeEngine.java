@@ -139,7 +139,7 @@ public class AuthoritativeEngine {
         });
     }
 
-    public Message answer(Message query) {
+    public Message answer(Message query, InetAddress clientIp) {
 
         Header qh = query.getHeader();
         org.xbill.DNS.Record qrec = query.getQuestion();
@@ -159,6 +159,7 @@ public class AuthoritativeEngine {
                 SOARecord soa = closestSoa(qname);
                 if (soa != null)
                     response.addRecord(soa, Section.AUTHORITY);
+                logger.info("Query ({}) [{}] [{}] | FAILURE (no matching zone)", String.valueOf(qrec.getName()), clientIp.getHostAddress(), Type.string(qrec.getType()));
                 return response;
             }
 
@@ -171,6 +172,7 @@ public class AuthoritativeEngine {
                 SOARecord soa = soaByZone.get(origin);
                 if (soa != null)
                     response.addRecord(soa, Section.AUTHORITY);
+                logger.info("Query ({}) [{}] [{}] | FAILURE (no answer records)", String.valueOf(qrec.getName()), clientIp.getHostAddress(), Type.string(qrec.getType()));
                 return response;
             }
 
@@ -195,13 +197,11 @@ public class AuthoritativeEngine {
                     response.addRecord(rr, Section.ADDITIONAL);
             }
 
-            logger.info("Query ({}), [{}] | SUCCESS", String.valueOf(qrec.getName()), Type.string(qrec.getType()));
-
             response.getHeader().setRcode(Rcode.NOERROR);
+            logger.info("Query ({}) [{}] [{}] | SUCCESS", String.valueOf(qrec.getName()), clientIp.getHostAddress(), Type.string(qrec.getType()));
             return response;
         } catch (Exception e) {
-            logger.info("Query ({}) [{}] | FAILURE", String.valueOf(qrec.getName()), Type.string(qrec.getType()));
-
+            logger.info("Query ({}) [{}] [{}] | FAILURE (exception)", String.valueOf(qrec.getName()), clientIp.getHostAddress(), Type.string(qrec.getType()));
             response.getHeader().setRcode(Rcode.SERVFAIL);
             return response;
         }
