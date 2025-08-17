@@ -1,0 +1,9 @@
+# Java
+/target/
+
+# Editor
+/.vscode/
+
+# Project
+/zones/
+/logs/
