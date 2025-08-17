@@ -7,3 +7,5 @@
 # Project
 /zones/
 /logs/
+.env
+/.data/
