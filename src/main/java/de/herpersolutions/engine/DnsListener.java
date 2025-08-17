@@ -15,16 +15,22 @@ import java.util.concurrent.Executors;
 import org.xbill.DNS.Flags;
 import org.xbill.DNS.Header;
 import org.xbill.DNS.Message;
+import de.herpersolutions.monitoring.DnsMetrics;
 
 public class DnsListener {
      private final int port;
         private final AuthoritativeEngine engine;
+        private final DnsMetrics metrics;
         private volatile boolean running = true;
         private DatagramSocket udpSocket;
         private ServerSocket tcpSocket;
         private final ExecutorService pool = Executors.newCachedThreadPool();
 
-        public DnsListener(int port, AuthoritativeEngine engine) { this.port = port; this.engine = engine; }
+        public DnsListener(int port, AuthoritativeEngine engine, DnsMetrics metrics) { 
+            this.port = port; 
+            this.engine = engine; 
+            this.metrics = metrics;
+        }
 
         public void run() throws IOException {
             udpSocket = new DatagramSocket(port);
@@ -53,6 +59,7 @@ public class DnsListener {
 
                     byte[] in = Arrays.copyOfRange(packet.getData(), packet.getOffset(), packet.getOffset()+packet.getLength());
 
+                    metrics.recordUdp();
                     Message query = new Message(in);
                     Message resp = engine.answer(query, packet.getAddress());
 
@@ -97,6 +104,7 @@ public class DnsListener {
                     int len;
                     try { len = in.readUnsignedShort(); } catch (EOFException eof) { break; }
                     byte[] msg = in.readNBytes(len);
+                    metrics.recordTcp();
                     Message query = new Message(msg);
                     Message resp = engine.answer(query, s.getInetAddress());
                     byte[] wire = resp.toWire();

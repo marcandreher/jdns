@@ -8,8 +8,11 @@ import org.slf4j.LoggerFactory;
 import org.xbill.DNS.TextParseException;
 
 import de.herpersolutions.Zones.ZoneStore;
+import de.herpersolutions.api.ManagementApi;
 import de.herpersolutions.engine.AuthoritativeEngine;
 import de.herpersolutions.engine.DnsListener;
+import de.herpersolutions.monitoring.DnsMetrics;
+import de.herpersolutions.security.RateLimiter;
 import io.github.cdimascio.dotenv.Dotenv;
 
 /**
@@ -32,6 +35,9 @@ public class App
             
         Config cfg = Config.fromArgs(dotenv);
         ZoneStore store = new ZoneStore(cfg.dataDir);
+        DnsMetrics metrics = new DnsMetrics();
+        RateLimiter rateLimiter = cfg.rateLimitEnabled ? 
+            new RateLimiter(cfg.maxQueriesPerSecond, 1000) : null;
 
         try {
             store.loadAll();
@@ -42,21 +48,26 @@ public class App
 
         AuthoritativeEngine engine;
         try {
-            engine = new AuthoritativeEngine(store);
+            engine = new AuthoritativeEngine(store, metrics, rateLimiter);
         } catch (TextParseException | UnknownHostException e) {
             logger.error("Failed to create AuthoritativeEngine", e);
             return;
         }
-        DnsListener listener = new DnsListener(cfg.port, engine);
+        
+        DnsListener listener = new DnsListener(cfg.port, engine, metrics);
+        ManagementApi managementApi = new ManagementApi(cfg.managementPort, store, metrics, engine);
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             logger.info("Shutting down DNS server...");
             listener.close();
+            managementApi.stop();
             try { store.saveAll(); } catch (Exception e) { logger.error("Failed to save zone data", e); }
         }));
 
-        logger.info("JDNS Server listening on UDP/TCP {}, zones={}, dataDir={}",
+        logger.info("JDNS Server listening on UDP/TCP localhost:{} zones={} dataDir={}",
                 cfg.port, store.zones.size(), cfg.dataDir.toAbsolutePath());
+
+        logger.info("Running Management API on http://localhost:{}", cfg.managementPort);
 
         // Keep running forever
         try {

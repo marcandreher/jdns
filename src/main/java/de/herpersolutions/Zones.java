@@ -67,7 +67,7 @@ public class Zones {
             this.gson = new GsonBuilder().setPrettyPrinting().create();
         }
 
-        void loadAll() throws IOException {
+        public void loadAll() throws IOException {
             if (!Files.exists(dir))
                 Files.createDirectories(dir);
             try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir, "*.zone.json")) {
@@ -122,7 +122,7 @@ public class Zones {
             return best != null ? zones.get(best) : null;
         }
 
-        static String normalize(String n) {
+        public static String normalize(String n) {
             return n.endsWith(".") ? n.toLowerCase() : (n + ".").toLowerCase();
         }
     }

@@ -3,7 +3,7 @@
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
             <charset>UTF-8</charset>
             <pattern>
-                %highlight(%-5level) %yellow(%d{yyyy-MM-dd HH:mm:ss}) %magenta(%logger{36}) - %msg%n%red(%throwable)
+                %cyan(%d{HH:mm:ss.SSS}) | %highlight(%-5level)| %magenta(%logger{100}) | %msg%n%red(%rootException)
             </pattern>
         </encoder>
     </appender>
@@ -13,12 +13,29 @@
             <fileNamePattern>logs/jdns-%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>30</maxHistory>
         </rollingPolicy>
-    
+
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss} %thread %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
-    
+
+    <!-- Disable all Jetty logs -->
+    <logger name="org.eclipse.jetty" level="OFF" additivity="false" />
+    <logger name="org.eclipse.jetty.server" level="OFF" additivity="false" />
+    <logger name="org.eclipse.jetty.server.Server" level="OFF" additivity="false" />
+    <logger name="org.eclipse.jetty.server.ServerConnector" level="OFF" additivity="false" />
+    <logger name="org.eclipse.jetty.server.AbstractConnector" level="OFF" additivity="false" />
+    <logger name="org.eclipse.jetty.server.AbstractNCSARequestLog" level="OFF" additivity="false" />
+    <logger name="org.eclipse.jetty.server.RequestLog" level="OFF" additivity="false" />
+    <logger name="org.eclipse.jetty.servlet" level="OFF" additivity="false" />
+    <logger name="org.eclipse.jetty.servlet.ServletHandler" level="OFF" additivity="false" />
+    <logger name="org.eclipse.jetty.servlet.ServletContextHandler" level="OFF" additivity="false" />
+    <logger name="org.eclipse.jetty.http" level="OFF" additivity="false" />
+    <logger name="org.eclipse.jetty.io" level="OFF" additivity="false" />
+    <logger name="org.eclipse.jetty.util" level="OFF" additivity="false" />
+
+    <logger name="io.javalin.Javalin" level="OFF" additivity="false" />
+
     <root>
         <appender-ref ref="STDOUT" />
         <appender-ref ref="ROLLING_FILE" />

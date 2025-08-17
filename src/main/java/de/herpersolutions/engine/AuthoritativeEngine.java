@@ -34,9 +34,13 @@ import org.xbill.DNS.Type;
 import de.herpersolutions.Zones.JsonRecord;
 import de.herpersolutions.Zones.JsonZone;
 import de.herpersolutions.Zones.ZoneStore;
+import de.herpersolutions.monitoring.DnsMetrics;
+import de.herpersolutions.security.RateLimiter;
 
 public class AuthoritativeEngine {
     private final ZoneStore store;
+    private final DnsMetrics metrics;
+    private final RateLimiter rateLimiter;
     // Index: fqdn -> list of records
     private final ConcurrentMap<Name, List<org.xbill.DNS.Record>> recordIndex = new ConcurrentHashMap<>();
     private final ConcurrentMap<Name, SOARecord> soaByZone = new ConcurrentHashMap<>();
@@ -44,12 +48,14 @@ public class AuthoritativeEngine {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthoritativeEngine.class);
 
-    public AuthoritativeEngine(ZoneStore store) throws TextParseException, UnknownHostException {
+    public AuthoritativeEngine(ZoneStore store, DnsMetrics metrics, RateLimiter rateLimiter) throws TextParseException, UnknownHostException {
         this.store = store;
+        this.metrics = metrics;
+        this.rateLimiter = rateLimiter;
         rebuildIndex();
     }
 
-    void rebuildIndex() throws TextParseException, UnknownHostException {
+    public void rebuildIndex() throws TextParseException, UnknownHostException {
         recordIndex.clear();
         soaByZone.clear();
         nsByZone.clear();
@@ -140,6 +146,19 @@ public class AuthoritativeEngine {
     }
 
     public Message answer(Message query, InetAddress clientIp) {
+        metrics.recordQuery();
+        
+        // Rate limiting check
+        if (rateLimiter != null && !rateLimiter.isAllowed(clientIp)) {
+            metrics.recordRateLimited();
+            Header qh = query.getHeader();
+            Message response = new Message();
+            response.setHeader(new Header(qh.getID()));
+            response.getHeader().setFlag(Flags.QR);
+            response.getHeader().setRcode(Rcode.REFUSED);
+            logger.warn("Rate limited query from {}", clientIp.getHostAddress());
+            return response;
+        }
 
         Header qh = query.getHeader();
         org.xbill.DNS.Record qrec = query.getQuestion();
@@ -159,6 +178,7 @@ public class AuthoritativeEngine {
                 SOARecord soa = closestSoa(qname);
                 if (soa != null)
                     response.addRecord(soa, Section.AUTHORITY);
+                metrics.recordNxdomain();
                 logger.info("Query ({}) [{}] [{}] | FAILURE (no matching zone)", String.valueOf(qrec.getName()), clientIp.getHostAddress(), Type.string(qrec.getType()));
                 return response;
             }
@@ -172,6 +192,7 @@ public class AuthoritativeEngine {
                 SOARecord soa = soaByZone.get(origin);
                 if (soa != null)
                     response.addRecord(soa, Section.AUTHORITY);
+                metrics.recordNoData();
                 logger.info("Query ({}) [{}] [{}] | FAILURE (no answer records)", String.valueOf(qrec.getName()), clientIp.getHostAddress(), Type.string(qrec.getType()));
                 return response;
             }
@@ -198,9 +219,11 @@ public class AuthoritativeEngine {
             }
 
             response.getHeader().setRcode(Rcode.NOERROR);
+            metrics.recordSuccess();
             logger.info("Query ({}) [{}] [{}] | SUCCESS", String.valueOf(qrec.getName()), clientIp.getHostAddress(), Type.string(qrec.getType()));
             return response;
         } catch (Exception e) {
+            metrics.recordFailure();
             logger.info("Query ({}) [{}] [{}] | FAILURE (exception)", String.valueOf(qrec.getName()), clientIp.getHostAddress(), Type.string(qrec.getType()));
             response.getHeader().setRcode(Rcode.SERVFAIL);
             return response;
